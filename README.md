@@ -22,7 +22,7 @@ pnpm dev
 默认代理后端网关：
 
 ```text
-http://localhost:8080/api
+http://localhost:8090/api
 ```
 
 演示账号：
