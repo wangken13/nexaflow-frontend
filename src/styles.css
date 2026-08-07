@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: #172026;
-  background: #edf1f2;
+  color: #20211d;
+  background: #efeee9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -28,9 +28,9 @@ button {
   align-items: center;
   padding: 56px;
   background:
-    linear-gradient(115deg, rgba(20, 91, 106, 0.92), rgba(23, 32, 38, 0.86)),
-    repeating-linear-gradient(90deg, transparent 0 28px, rgba(255, 255, 255, 0.06) 28px 29px);
-  color: #f8fbfb;
+    linear-gradient(115deg, rgba(24, 25, 23, 0.94), rgba(80, 74, 61, 0.88)),
+    repeating-linear-gradient(90deg, transparent 0 32px, rgba(238, 218, 176, 0.08) 32px 33px);
+  color: #fbfaf5;
 }
 
 .login-copy {
@@ -39,7 +39,7 @@ button {
 
 .eyebrow {
   margin: 0 0 12px;
-  color: #77c9c1;
+  color: #b89455;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -59,7 +59,7 @@ button {
 
 .login-copy p:last-child {
   max-width: 560px;
-  color: #d9e6e4;
+  color: #e1d8c8;
   font-size: 18px;
   line-height: 1.8;
 }
@@ -68,10 +68,10 @@ button {
   display: grid;
   gap: 18px;
   padding: 32px;
-  background: #f8fbfb;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: #fbfaf5;
+  border: 1px solid rgba(184, 148, 85, 0.35);
   border-radius: 8px;
-  color: #172026;
+  color: #20211d;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
 }
 
@@ -88,7 +88,11 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  background: #edf1f2;
+  background: #efeee9;
+}
+
+.premium-workspace {
+  color: #20211d;
 }
 
 .rail {
@@ -100,7 +104,7 @@ button {
   gap: 12px;
   justify-items: center;
   padding: 14px 0;
-  background: #172026;
+  background: #191917;
 }
 
 .brand {
@@ -109,8 +113,8 @@ button {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: #d6ff5b;
-  color: #172026;
+  background: linear-gradient(135deg, #d9bd7a, #9d7437);
+  color: #191917;
   font-weight: 900;
 }
 
@@ -121,7 +125,7 @@ button {
   place-items: center;
   border: 0;
   border-radius: 8px;
-  color: #aebcc0;
+  color: #bdb7aa;
   background: transparent;
   cursor: pointer;
 }
@@ -133,8 +137,8 @@ button {
 
 .rail-button.active,
 .rail-button:hover {
-  color: #172026;
-  background: #77c9c1;
+  color: #191917;
+  background: #d9bd7a;
 }
 
 .rail-button.bottom {
@@ -160,44 +164,65 @@ button {
   font-size: 30px;
 }
 
-.metric-strip {
+.premium-topbar {
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d9d3c8;
+}
+
+.privacy-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #cdbb98;
+  border-radius: 8px;
+  color: #6e5a31;
+  background: #fbfaf5;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flow-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.metric,
+.flow-step,
 .panel {
-  border: 1px solid #d5dddf;
-  background: #f8fbfb;
+  border: 1px solid #d9d3c8;
+  background: #fbfaf5;
   border-radius: 8px;
 }
 
-.metric {
-  min-height: 96px;
-  padding: 18px;
-  border-left: 5px solid #145b6a;
+.flow-step {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  color: #6f6a60;
+  position: relative;
 }
 
-.metric strong {
-  display: block;
-  font-size: 34px;
+.flow-step::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 12px;
+  border-radius: 999px;
+  background: #cdbb98;
 }
 
-.metric span {
-  color: #627177;
+.flow-step.active {
+  color: #20211d;
+  border-color: #b89455;
+  background: #fffdf7;
+  box-shadow: inset 0 0 0 1px rgba(184, 148, 85, 0.18);
 }
 
-.metric.amber {
-  border-left-color: #c9822a;
-}
-
-.metric.green {
-  border-left-color: #3f8f64;
-}
-
-.metric.red {
-  border-left-color: #be4c4c;
+.flow-step.active::before {
+  background: #8f672b;
 }
 
 .workbench,
@@ -209,7 +234,12 @@ button {
 
 .panel {
   min-width: 0;
-  padding: 20px;
+  padding: 22px;
+}
+
+.command-panel,
+.intelligence-panel {
+  min-height: 520px;
 }
 
 .panel-title {
@@ -229,8 +259,8 @@ button {
 .status {
   padding: 4px 8px;
   border-radius: 8px;
-  background: #ffe2c0;
-  color: #7b3e00;
+  background: #eee1c7;
+  color: #7c5c25;
   font-size: 12px;
   font-weight: 800;
 }
@@ -240,13 +270,14 @@ button {
 .row-item {
   padding: 14px 0;
   border-top: 1px solid #dde5e7;
+  border-top-color: #ddd6c9;
 }
 
 .analysis-block label,
 .draft label {
   display: block;
   margin-bottom: 8px;
-  color: #627177;
+  color: #777064;
   font-size: 12px;
   font-weight: 800;
 }
@@ -260,9 +291,9 @@ button {
   min-height: 280px;
   display: grid;
   place-items: center;
-  color: #627177;
+  color: #777064;
   text-align: center;
-  border: 1px dashed #b7c5c8;
+  border: 1px dashed #c7b99f;
   border-radius: 8px;
   padding: 24px;
 }
@@ -272,7 +303,7 @@ button {
 }
 
 .row-item small {
-  color: #627177;
+  color: #777064;
 }
 
 @media (max-width: 900px) {
@@ -280,7 +311,7 @@ button {
   .workspace,
   .workbench,
   .lower-grid,
-  .metric-strip {
+  .flow-strip {
     grid-template-columns: 1fr;
   }
 
