@@ -1,11 +1,13 @@
 {
-  "name": "trade-ai-assistant-frontend",
+  "name": "nexaflow-frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
+    "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build",
+    "test": "node scripts/frontend-unit-test.mjs && node scripts/api-contract-check.mjs && node scripts/ui-structure-check.mjs && node scripts/customer-readability-check.mjs && vue-tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
