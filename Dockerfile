@@ -1,7 +1,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN npm install --global pnpm@9.15.4 \
+    && pnpm config set store-dir /pnpm/store \
+    && pnpm install --frozen-lockfile --package-import-method=copy
 COPY . .
 RUN pnpm build
 
