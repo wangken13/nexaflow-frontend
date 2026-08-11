@@ -20,7 +20,8 @@ http.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       clearAccessToken()
-      if (location.pathname !== '/login') location.assign('/login')
+      const isLogoutRequest = error.config?.url === '/auth/logout'
+      if (!isLogoutRequest && location.pathname !== '/login') location.assign('/login')
     }
     return Promise.reject(error)
   }

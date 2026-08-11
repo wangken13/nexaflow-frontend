@@ -39,17 +39,18 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async logout(clearCookie = true) {
-      this.token = ''
-      this.tenantId = ''
-      this.role = ''
-      this.username = ''
-      clearAccessToken()
-      if (clearCookie) {
-        try {
+      try {
+        if (clearCookie) {
           await request<void>('/auth/logout', { method: 'post' })
-        } catch {
-          // The local session is still cleared; a later request will handle a server outage.
         }
+      } catch {
+        // Local logout must remain available when the session is already invalid or the server is unavailable.
+      } finally {
+        this.token = ''
+        this.tenantId = ''
+        this.role = ''
+        this.username = ''
+        clearAccessToken()
       }
     }
   }
