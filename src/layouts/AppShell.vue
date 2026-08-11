@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowDown, Bell, Box, Collection, DataAnalysis, Document, Finished, Message, Setting, SwitchButton, User } from '@element-plus/icons-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { tradeApi } from '../api/trade'
 import { useAuthStore } from '../stores/auth'
 import { labelOf, roleLabels } from '../utils/presentation'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const unreadCount = ref(0)
+const isLoggingOut = ref(false)
 const todayLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date())
 const pageContext = computed(() => ({
   '/': ['经营总览', '今天需要优先处理的客户与订单工作'],
@@ -31,9 +33,15 @@ const nav = [
   { to: '/tasks', label: '跟进任务', icon: Finished }
 ]
 
-function logout() {
-  auth.logout()
-  location.href = '/login'
+async function logout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  try {
+    await auth.logout()
+  } finally {
+    await router.replace('/login')
+    isLoggingOut.value = false
+  }
 }
 
 async function loadSignals() {
