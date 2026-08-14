@@ -585,6 +585,7 @@ button {
 .master-pane { align-self: start; padding: 16px; }
 .detail-pane { min-height: 650px; padding: 24px; }
 .record-button { width: 100%; min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 10px; border: 0; border-bottom: 1px solid #25313a; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.record-button > div { min-width: 0; flex: 1 1 auto; }
 .record-button:hover, .record-button.active { background: #14232c; }
 .record-button.active { box-shadow: inset 3px 0 #52dbec; }
 .record-button strong, .record-button small { display: block; }
@@ -611,7 +612,7 @@ button {
 .table-toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
 .table-toolbar .el-input { width: min(420px, 100%); }
 .money { color: #e5c978; font-family: Consolas, monospace; }
-.state-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 1px solid #2c6670; border-radius: 5px; color: #73e4ef; background: #10262b; font-size: 11px; font-weight: 800; }
+.state-chip { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-height: 24px; padding: 0 8px; border: 1px solid #2c6670; border-radius: 5px; color: #73e4ef; background: #10262b; font-size: 11px; font-weight: 800; line-height: 1; white-space: nowrap; word-break: keep-all; }
 .state-chip.muted { border-color: #46525a; color: #93a0a7; background: #171e23; }
 .state-chip.danger { border-color: #7a4141; color: #ff9a92; background: #281515; }
 .state-chip.priority { border-color: #765f2f; color: #efd47e; background: #261f11; }
