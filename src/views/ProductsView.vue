@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Search } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Search, Upload } from '@element-plus/icons-vue'
 import { tradeApi, type ProductView, type UpsertProductRequest } from '../api/trade'
 import { currencyOptions } from '../utils/presentation'
 import { useAuthStore } from '../stores/auth'
 import { hasPermission } from '../security/permissions'
+import { parseCsv } from '../utils/csv'
 
 const auth = useAuthStore()
 
@@ -14,18 +15,33 @@ const keyword = ref('')
 const dialog = ref(false)
 const editingId = ref('')
 const loading = ref(false)
+const importInput = ref<HTMLInputElement>()
+const importing = ref(false)
 const form = ref<UpsertProductRequest>({ sku: '', name: '', specification: '', currency: 'USD', unitPrice: 0, moq: 1, active: true })
 async function load() { loading.value = true; try { products.value = await tradeApi.products(keyword.value) } finally { loading.value = false } }
 function create() { editingId.value = ''; form.value = { sku: '', name: '', specification: '', currency: 'USD', unitPrice: 0, moq: 1, active: true }; dialog.value = true }
 function edit(item: ProductView) { editingId.value = item.id; form.value = { sku: item.sku, name: item.name, specification: item.specification, currency: item.currency, unitPrice: item.unitPrice, moq: item.moq, active: item.active }; dialog.value = true }
 async function save() { if (!form.value.sku.trim() || !form.value.name.trim()) return ElMessage.warning('请填写产品编号和产品名称'); editingId.value ? await tradeApi.updateProduct(editingId.value, form.value) : await tradeApi.createProduct(form.value); dialog.value = false; await load(); ElMessage.success('产品资料已保存') }
 async function remove(item: ProductView) { await ElMessageBox.confirm(`确认删除产品 ${item.name}？`, '删除产品', { type: 'warning' }); await tradeApi.deleteProduct(item.id); await load(); ElMessage.success('产品已删除') }
+async function importProducts(event: Event) {
+  const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ''; if (!file) return
+  if (file.size > 2 * 1024 * 1024) return ElMessage.warning('CSV 文件不能超过 2MB')
+  importing.value = true
+  try {
+    const rows = parseCsv(await file.text()).map(row => ({ sku: row.sku || row['产品编号'], name: row.name || row['产品名称'], specification: row.specification || row['规格'] || '', currency: (row.currency || row['币种'] || 'USD').toUpperCase(), unitPrice: Number(row.unitprice || row.unit_price || row['单价'] || 0), moq: Number(row.moq || row['起订量'] || 1), active: !['false', '0', '停用'].includes((row.active || row['状态'] || 'true').toLowerCase()) }))
+    if (rows.length > 500) throw new Error('单次最多导入 500 条产品')
+    if (rows.some(row => !Number.isFinite(row.unitPrice) || !Number.isInteger(row.moq))) throw new Error('产品单价必须是数字，起订量必须是整数')
+    const result = await tradeApi.importProducts(rows); await load()
+    result.skipped ? ElMessage.warning(`成功导入 ${result.imported} 条，跳过 ${result.skipped} 条：${result.errors.slice(0, 2).join('；')}`) : ElMessage.success(`成功导入 ${result.imported} 条产品`)
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '产品导入失败') }
+  finally { importing.value = false }
+}
 onMounted(load)
 </script>
 
 <template>
   <section class="page-shell">
-    <header class="page-head"><div><p class="section-kicker">标准商品数据</p><h1>产品目录</h1><p>统一管理产品编号、规格、价格和起订量，报价时直接带入。</p></div><el-button v-if="hasPermission(auth.role, 'product:write')" type="primary" :icon="Plus" @click="create">新增产品</el-button></header>
+    <header class="page-head"><div><p class="section-kicker">标准商品数据</p><h1>产品目录</h1><p>统一管理产品编号、规格、价格和起订量，报价时直接带入。</p></div><div v-if="hasPermission(auth.role, 'product:write')" class="action-row"><input ref="importInput" class="visually-hidden" type="file" accept=".csv,text/csv" @change="importProducts"><el-button :icon="Upload" :loading="importing" @click="importInput?.click()">导入 CSV</el-button><el-button type="primary" :icon="Plus" @click="create">新增产品</el-button></div></header>
     <section class="surface table-surface" v-loading="loading">
       <div class="table-toolbar"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索产品编号或名称" clearable @keyup.enter="load"/><el-button @click="load">搜索</el-button></div>
       <el-table :data="products" row-key="id">

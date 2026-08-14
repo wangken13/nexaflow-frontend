@@ -8,9 +8,14 @@ export interface ProductView { id: string; tenantId: string; sku: string; name: 
 export interface InquiryView { id: string; tenantId: string; customerId: string; subject: string; content: string; status: string; createdAt: string }
 export interface InquiryAnalysis { intent: string; urgency: string; nextActions: string[]; modelSummary: string; replyDraft: string; quotationDraft: string }
 export interface AiProviderStatus { provider: string; model: string; configured: boolean; fallbackEnabled: boolean }
+export interface KnowledgeArticleView { id: string; tenantId: string; title: string; category: string; content: string; active: boolean; updatedBy: string; createdAt: string; updatedAt: string }
+export interface ChannelConfigView { id: string; channelType: string; displayName: string; accountRef: string; enabled: boolean; connectionStatus: string; updatedAt: string }
+export interface SubscriptionView { planCode: string; planName: string; monthlyPrice: number; membersUsed: number; memberLimit: number; customersUsed: number; customerLimit: number; aiCreditsUsed: number; aiCreditLimit: number }
+export interface BulkImportResult { received: number; imported: number; skipped: number; errors: string[] }
 export interface AiStreamEvent { type: 'delta' | 'complete' | 'error'; delta?: string; analysis?: InquiryAnalysis; message?: string }
 export interface QuotationItemView { id: string; productId: string; productName: string; specification: string; quantity: number; unitPrice: number; amount: number }
 export interface QuotationView { id: string; tenantId: string; customerId: string; quotationNo: string; productName: string; quantity: number; unitPrice: number; currency: string; tradeTerm: string; destinationPort: string; freight: number; totalAmount: number; validUntil: string; notes: string; status: string; items: QuotationItemView[]; createdAt: string }
+export interface QuotationApprovalView { id: string; quotationId: string; action: string; comment: string; operatorId: string; createdAt: string }
 export interface OrderView { id: string; tenantId: string; customerId: string; customerName: string; productId: string; productName: string; status: string; deliveryDate: string; risk: boolean }
 export interface TaskView { id: string; tenantId: string; title: string; priority: string; status: string; dueAt: string; relatedType: string; relatedId: string }
 export interface NotificationView { id: string; tenantId: string; title: string; content: string; read: boolean; createdAt: string }
@@ -49,11 +54,19 @@ export const tradeApi = {
   updateMemberRole: (id: string, role: string) => request<MemberView>(`/tenant/members/${id}/role/${role}`, { method: 'patch' }),
   updateMemberStatus: (id: string, status: string) => request<MemberView>(`/tenant/members/${id}/status/${status}`, { method: 'patch' }),
   auditLogs: (module = '', keyword = '') => request<AuditLogView[]>(`/tenant/audit-logs?module=${encodeURIComponent(module)}&keyword=${encodeURIComponent(keyword)}`),
+  knowledgeArticles: () => request<KnowledgeArticleView[]>('/tenant/knowledge'),
+  createKnowledgeArticle: (data: { title: string; category: string; content: string; active: boolean }) => request<KnowledgeArticleView>('/tenant/knowledge', { method: 'post', data }),
+  updateKnowledgeArticle: (id: string, data: { title: string; category: string; content: string; active: boolean }) => request<KnowledgeArticleView>(`/tenant/knowledge/${id}`, { method: 'put', data }),
+  deleteKnowledgeArticle: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: 'delete' }),
+  channels: () => request<ChannelConfigView[]>('/tenant/channels'),
+  saveChannel: (data: { channelType: string; displayName: string; accountRef: string; enabled: boolean }) => request<ChannelConfigView>('/tenant/channels', { method: 'put', data }),
+  subscription: () => request<SubscriptionView>('/tenant/subscription'),
   dailyReport: () => request<DailyReport>('/task/daily-report'),
   customers: () => request<CustomerView[]>('/customer'),
   customerTags: () => request<string[]>('/customer/tags'),
   customer: (id: string) => request<CustomerDetailView>(`/customer/${id}`),
   createCustomer: (data: CreateCustomerRequest) => request<CustomerView>('/customer', { method: 'post', data }),
+  importCustomers: (rows: CreateCustomerRequest[]) => request<BulkImportResult>('/customer/import', { method: 'post', data: { rows } }),
   updateCustomer: (id: string, data: CreateCustomerRequest) => request<CustomerView>(`/customer/${id}`, { method: 'put', data }),
   deleteCustomer: (id: string) => request<void>(`/customer/${id}`, { method: 'delete' }),
   addContact: (id: string, data: { name: string; email: string; phone: string; position: string; primary: boolean }) => request<ContactView>(`/customer/${id}/contacts`, { method: 'post', data }),
@@ -61,6 +74,7 @@ export const tradeApi = {
   products: (keyword = '') => request<ProductView[]>(`/product?keyword=${encodeURIComponent(keyword)}`),
   product: (id: string) => request<ProductView>(`/product/${id}`),
   createProduct: (data: UpsertProductRequest) => request<ProductView>('/product', { method: 'post', data }),
+  importProducts: (rows: UpsertProductRequest[]) => request<BulkImportResult>('/product/import', { method: 'post', data: { rows } }),
   updateProduct: (id: string, data: UpsertProductRequest) => request<ProductView>(`/product/${id}`, { method: 'put', data }),
   deleteProduct: (id: string) => request<void>(`/product/${id}`, { method: 'delete' }),
   inquiries: () => request<InquiryView[]>('/inquiry'),
@@ -76,6 +90,9 @@ export const tradeApi = {
   quotation: (id: string) => request<QuotationView>(`/quotation/${id}`),
   createQuotation: (data: CreateQuotationRequest) => request<QuotationView>('/quotation', { method: 'post', data }),
   updateQuotationStatus: (id: string, status: string) => request<QuotationView>(`/quotation/${id}/status/${status}`, { method: 'patch' }),
+  quotationApprovals: (id: string) => request<QuotationApprovalView[]>(`/quotation/${id}/approvals`),
+  submitQuotationApproval: (id: string, comment: string) => request<QuotationView>(`/quotation/${id}/submit-approval`, { method: 'post', data: { comment } }),
+  decideQuotationApproval: (id: string, approved: boolean, comment: string) => request<QuotationView>(`/quotation/${id}/${approved ? 'approve' : 'reject'}`, { method: 'post', data: { comment } }),
   orders: () => request<OrderView[]>('/order'),
   createOrder: (data: CreateOrderRequest) => request<OrderView>('/order', { method: 'post', data }),
   updateOrderStatus: (id: string, status: string) => request<OrderView>(`/order/${id}/status/${status}`, { method: 'patch' }),

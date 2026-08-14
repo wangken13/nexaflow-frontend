@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Search } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Search, Upload } from '@element-plus/icons-vue'
 import { tradeApi, type CustomerDetailView, type CustomerView } from '../api/trade'
 import { contactPositionLabel, contactPositionOptions, countryLabel, countryOptions, customerTagLabel, customerTagOptions, formatDateTime } from '../utils/presentation'
 import { useAuthStore } from '../stores/auth'
 import { hasPermission } from '../security/permissions'
+import { parseCsv } from '../utils/csv'
 
 const auth = useAuthStore()
 
@@ -19,6 +20,8 @@ const editingId = ref('')
 const customerForm = ref({ name: '', country: '', tag: '' })
 const contactForm = ref({ name: '', email: '', phone: '', position: '', primary: false })
 const followup = ref('')
+const importInput = ref<HTMLInputElement>()
+const importing = ref(false)
 const tagOptions = ref(customerTagOptions)
 const filtered = computed(() => customers.value.filter(item => `${item.name}${item.country}${item.tag}`.toLowerCase().includes(keyword.value.toLowerCase())))
 
@@ -30,12 +33,28 @@ async function saveCustomer() { if (!customerForm.value.name.trim()) return ElMe
 async function removeCustomer() { if (!selected.value) return; await ElMessageBox.confirm('删除客户将同时删除联系人和跟进记录，确认继续？', '删除客户', { type: 'warning' }); await tradeApi.deleteCustomer(selected.value.customer.id); selected.value = null; await load(); ElMessage.success('客户已删除') }
 async function addContact() { if (!selected.value || !contactForm.value.name.trim()) return; await tradeApi.addContact(selected.value.customer.id, contactForm.value); contactDialog.value = false; contactForm.value = { name: '', email: '', phone: '', position: '', primary: false }; await openDetail(selected.value.customer.id); ElMessage.success('联系人已添加') }
 async function addFollowup() { if (!selected.value || !followup.value.trim()) return; await tradeApi.addFollowup(selected.value.customer.id, { type: 'NOTE', content: followup.value, operatorName: '当前用户' }); followup.value = ''; await openDetail(selected.value.customer.id); ElMessage.success('跟进记录已保存') }
+async function importCustomers(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) return ElMessage.warning('CSV 文件不能超过 2MB')
+  importing.value = true
+  try {
+    const rows = parseCsv(await file.text()).map(row => ({ name: row.name || row['客户名称'], country: row.country || row['国家地区'] || '', tag: row.tag || row['客户标签'] || '' }))
+    if (rows.length > 500) throw new Error('单次最多导入 500 条客户')
+    const result = await tradeApi.importCustomers(rows)
+    await load()
+    result.skipped ? ElMessage.warning(`成功导入 ${result.imported} 条，跳过 ${result.skipped} 条：${result.errors.slice(0, 2).join('；')}`) : ElMessage.success(`成功导入 ${result.imported} 条客户`)
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '客户导入失败') }
+  finally { importing.value = false }
+}
 onMounted(load)
 </script>
 
 <template>
   <section class="page-shell">
-    <header class="page-head"><div><p class="section-kicker">客户资产</p><h1>客户中心</h1><p>把联系人、沟通记录和商机脉络放在同一份客户档案里。</p></div><el-button v-if="hasPermission(auth.role, 'customer:write')" type="primary" :icon="Plus" @click="openCreate">新建客户</el-button></header>
+    <header class="page-head"><div><p class="section-kicker">客户资产</p><h1>客户中心</h1><p>把联系人、沟通记录和商机脉络放在同一份客户档案里。</p></div><div v-if="hasPermission(auth.role, 'customer:write')" class="action-row"><input ref="importInput" class="visually-hidden" type="file" accept=".csv,text/csv" @change="importCustomers"><el-button :icon="Upload" :loading="importing" @click="importInput?.click()">导入 CSV</el-button><el-button type="primary" :icon="Plus" @click="openCreate">新建客户</el-button></div></header>
     <div class="master-detail">
       <section v-loading="loading" class="surface master-pane">
         <el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索客户、国家或标签" clearable />
