@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, streamSse } from './http'
 
 export interface CustomerView { id: string; tenantId: string; name: string; country: string; tag: string; createdAt: string }
 export interface ContactView { id: string; customerId: string; name: string; email: string; phone: string; position: string; primary: boolean; createdAt: string }
@@ -7,6 +7,8 @@ export interface CustomerDetailView { customer: CustomerView; contacts: ContactV
 export interface ProductView { id: string; tenantId: string; sku: string; name: string; specification: string; currency: string; unitPrice: number; moq: number; active: boolean; createdAt: string }
 export interface InquiryView { id: string; tenantId: string; customerId: string; subject: string; content: string; status: string; createdAt: string }
 export interface InquiryAnalysis { intent: string; urgency: string; nextActions: string[]; modelSummary: string; replyDraft: string; quotationDraft: string }
+export interface AiProviderStatus { provider: string; model: string; configured: boolean; fallbackEnabled: boolean }
+export interface AiStreamEvent { type: 'delta' | 'complete' | 'error'; delta?: string; analysis?: InquiryAnalysis; message?: string }
 export interface QuotationItemView { id: string; productId: string; productName: string; specification: string; quantity: number; unitPrice: number; amount: number }
 export interface QuotationView { id: string; tenantId: string; customerId: string; quotationNo: string; productName: string; quantity: number; unitPrice: number; currency: string; tradeTerm: string; destinationPort: string; freight: number; totalAmount: number; validUntil: string; notes: string; status: string; items: QuotationItemView[]; createdAt: string }
 export interface OrderView { id: string; tenantId: string; customerId: string; customerName: string; productId: string; productName: string; status: string; deliveryDate: string; risk: boolean }
@@ -24,7 +26,7 @@ export interface WechatAuthorizationResponse { authorizationUrl: string }
 
 export interface CreateCustomerRequest { name: string; country: string; tag: string }
 export interface UpsertProductRequest { sku: string; name: string; specification: string; currency: string; unitPrice: number; moq: number; active: boolean }
-export interface CreateInquiryRequest { customerId: string; subject: string; content: string }
+export interface CreateInquiryRequest { customerId: string; subject: string; content: string; analysisMode?: 'ASYNC' | 'STREAM' }
 export interface QuotationItemRequest { productId: string; productName: string; specification: string; quantity: number; unitPrice: number }
 export interface CreateQuotationRequest { customerId: string; currency: string; tradeTerm: string; destinationPort: string; freight: number; validUntil: string; notes: string; items: QuotationItemRequest[] }
 export interface CreateOrderRequest { customerId: string; productId: string; deliveryDate: string }
@@ -66,7 +68,10 @@ export const tradeApi = {
   createInquiry: (data: CreateInquiryRequest) => request<InquiryView>('/inquiry', { method: 'post', data }),
   updateInquiryStatus: (id: string, status: string) => request<InquiryView>(`/inquiry/${id}/status/${status}`, { method: 'patch' }),
   analyzeInquiry: (inquiryId: string, content: string) => request<InquiryAnalysis>('/ai/analyze-inquiry', { method: 'post', data: { inquiryId, content } }),
+  streamInquiryAnalysis: (inquiryId: string, content: string, onEvent: (event: AiStreamEvent) => void, signal?: AbortSignal) =>
+    streamSse<AiStreamEvent>('/ai/analyze-inquiry/stream', { inquiryId, content }, message => onEvent(message.data), signal),
   analysisHistory: (inquiryId: string) => request<InquiryAnalysis[]>(`/ai/inquiries/${inquiryId}/history`),
+  aiProviderStatus: () => request<AiProviderStatus>('/ai/provider-status'),
   quotations: () => request<QuotationView[]>('/quotation'),
   quotation: (id: string) => request<QuotationView>(`/quotation/${id}`),
   createQuotation: (data: CreateQuotationRequest) => request<QuotationView>('/quotation', { method: 'post', data }),

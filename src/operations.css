@@ -246,6 +246,12 @@
 .source-message { border-color: var(--nx-line); border-radius: 10px; background: var(--nx-sunken); }
 .source-message p, .draft-block p { color: var(--nx-ink-soft); }
 .analysis-sheet { border-top-color: var(--nx-accent); background: #fbfaff; }
+.streaming-analysis { min-height: 190px; }
+.streaming-content { white-space: pre-wrap; line-height: 1.8; }
+.streaming-placeholder { color: var(--nx-ink-faint); }
+.streaming-status { color: var(--nx-accent); font-size: 13px; font-weight: 700; }
+.streaming-cursor { display: inline-block; width: 2px; height: 1em; margin-left: 3px; vertical-align: -2px; background: var(--nx-accent); animation: streaming-blink 0.9s steps(1) infinite; }
+@keyframes streaming-blink { 50% { opacity: 0; } }
 .analysis-head, .analysis-grid article, .draft-block { border-bottom-color: var(--nx-line); }
 .analysis-grid article + article { border-left-color: var(--nx-line); }
 .analysis-grid p, .analysis-grid li { color: var(--nx-ink-soft); }
@@ -267,6 +273,21 @@
 .member-cell strong { color: var(--nx-ink); }
 .audit-action, .business-reference span { color: var(--nx-accent-strong); }
 .business-reference strong { color: var(--nx-ink-soft); }
+.ai-provider-head { min-height: 66px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--nx-line); }
+.ai-provider-head span { color: var(--nx-accent-strong); font: 700 10px/1 var(--nx-font-mono); }
+.ai-provider-head h2 { margin: 8px 0 0; color: var(--nx-ink); font-family: var(--nx-font-display); font-size: 20px; }
+.ai-provider-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--nx-line); }
+.ai-provider-grid > div { min-width: 0; padding: 22px 18px; border-right: 1px solid var(--nx-line); }
+.ai-provider-grid > div:first-child { padding-left: 0; }
+.ai-provider-grid > div:last-child { border-right: 0; }
+.ai-provider-grid span, .ai-provider-grid strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-provider-grid span { color: var(--nx-ink-faint); font-size: 11px; }
+.ai-provider-grid strong { margin-top: 9px; color: var(--nx-ink); font-size: 15px; }
+.ai-provider-grid .status-ok { color: var(--nx-ok); }
+.ai-provider-grid .status-warn { color: #a56712; }
+.ai-provider-message { margin-top: 18px; padding: 12px 14px; border-left: 3px solid var(--nx-ok); color: var(--nx-ink-soft); background: #f3fbf8; font-size: 12px; }
+.ai-provider-message.warning { border-left-color: #d59a32; background: #fff9ec; }
+.ai-provider-message.error { border-left-color: #c94b4b; background: #fff4f5; }
 
 /* Login is a focused product entry: real business imagery, one quiet form surface. */
 .login-shell.enterprise-auth-shell {
@@ -297,9 +318,9 @@
 }
 .login-shell.enterprise-auth-shell::before { display: none; }
 .login-shell.enterprise-auth-shell::after { display: none; }
-.login-visual { position: absolute; z-index: 0; inset: 0; min-height: 100svh; display: block; overflow: hidden; padding: clamp(26px, 3.2vw, 54px); border-radius: 0; box-shadow: none; }
-.login-backdrop { position: absolute; z-index: 0; inset: 0; display: block; background: url("/images/trade-port-login.png") 52% center / cover no-repeat; }
-.login-visual::after { content: ""; position: absolute; z-index: 0; inset: 0; background: linear-gradient(120deg, rgba(8, 22, 42, .7) 2%, rgba(11, 29, 53, .5) 48%, rgba(9, 22, 41, .58) 100%); }
+.login-visual { position: absolute; z-index: 0; inset: 0; min-height: 100svh; display: block; overflow: hidden; padding: clamp(26px, 3.2vw, 54px); border-radius: 0; background: #07101e url("/media/login-cosmos-poster-v2.jpg") center / cover no-repeat; box-shadow: none; }
+.login-backdrop { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; pointer-events: none; }
+.login-visual::after { content: ""; position: absolute; z-index: 0; inset: 0; background: linear-gradient(120deg, rgba(5, 13, 29, .74) 2%, rgba(8, 19, 40, .48) 48%, rgba(5, 12, 27, .68) 100%); }
 .login-visual > :not(.login-backdrop) { position: relative; z-index: 1; }
 .login-brand { display: flex; align-items: center; gap: 11px; align-self: start; }
 .login-brand > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.32); border-radius: 9px; color: #153b76; background: #d8e8ff; font: 800 12px/1 var(--nx-font-mono); }
@@ -378,4 +399,12 @@
   .login-auth-area { min-height: 100svh; padding: 18px; }
   .login-panel { width: 100%; padding: 24px 20px; border-radius: 14px; }
   .login-footer { width: 100%; }
+  .ai-provider-grid { grid-template-columns: 1fr 1fr; }
+  .ai-provider-grid > div:nth-child(2) { border-right: 0; }
+  .ai-provider-grid > div:nth-child(-n+2) { border-bottom: 1px solid var(--nx-line); }
+  .ai-provider-grid > div:nth-child(3) { padding-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-backdrop { display: none; }
 }

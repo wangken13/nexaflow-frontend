@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
-import { tradeApi, type AuditLogView, type MemberView } from '../api/trade'
+import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { tradeApi, type AiProviderStatus, type AuditLogView, type MemberView } from '../api/trade'
 import { useAuthStore } from '../stores/auth'
 import { formatDateTime, humanizeSystemText, roleLabels } from '../utils/presentation'
 import { workEmailValidationMessage } from '../utils/validation'
@@ -10,6 +10,9 @@ import { workEmailValidationMessage } from '../utils/validation'
 const auth = useAuthStore()
 const members = ref<MemberView[]>([])
 const audits = ref<AuditLogView[]>([])
+const aiProvider = ref<AiProviderStatus>()
+const aiStatusLoading = ref(false)
+const aiStatusError = ref('')
 const activeTab = ref('members')
 const memberDialog = ref(false)
 const saving = ref(false)
@@ -35,9 +38,22 @@ const actionLabels: Record<string, string> = {
 }
 const activeMembers = computed(() => members.value.filter(item => item.status === 'ACTIVE').length)
 const privilegedMembers = computed(() => members.value.filter(item => ['OWNER', 'ADMIN'].includes(item.role)).length)
+const canManageAi = computed(() => ['OWNER', 'ADMIN'].includes(auth.role))
 
 async function loadMembers() { members.value = await tradeApi.members() }
 async function loadAudits() { audits.value = await tradeApi.auditLogs(auditModule.value, auditKeyword.value) }
+async function loadAiProviderStatus() {
+  if (!canManageAi.value) return
+  aiStatusLoading.value = true
+  aiStatusError.value = ''
+  try {
+    aiProvider.value = await tradeApi.aiProviderStatus()
+  } catch (error) {
+    aiStatusError.value = error instanceof Error ? error.message : 'AI 服务状态读取失败'
+  } finally {
+    aiStatusLoading.value = false
+  }
+}
 async function createMember() {
   const valid = await memberFormRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -61,7 +77,9 @@ async function toggleStatus(member: MemberView) {
   try { await tradeApi.updateMemberStatus(member.id, status); await Promise.all([loadMembers(), loadAudits()]); ElMessage.success(status === 'ACTIVE' ? '账号已启用' : '账号已停用') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '状态更新失败') }
 }
-onMounted(async () => { await Promise.all([loadMembers(), loadAudits()]) })
+onMounted(async () => {
+  await Promise.all([loadMembers(), loadAudits(), loadAiProviderStatus()])
+})
 </script>
 
 <template>
@@ -93,6 +111,22 @@ onMounted(async () => { await Promise.all([loadMembers(), loadAudits()]) })
             <el-table-column label="变更详情" min-width="260"><template #default="{ row }">{{ humanizeSystemText(row.detail) }}</template></el-table-column>
           </el-table>
           <div v-if="!audits.length" class="empty-compact">暂无符合条件的审计记录</div>
+        </el-tab-pane>
+        <el-tab-pane v-if="canManageAi" label="AI 服务" name="ai">
+          <div class="ai-provider-head">
+            <div><span>智能分析引擎</span><h2>模型运行状态</h2></div>
+            <el-button :icon="Refresh" :loading="aiStatusLoading" @click="loadAiProviderStatus">刷新状态</el-button>
+          </div>
+          <div v-if="aiStatusError" class="ai-provider-message error">{{ aiStatusError }}</div>
+          <div v-else-if="aiProvider" v-loading="aiStatusLoading" class="ai-provider-grid">
+            <div><span>模型供应商</span><strong>{{ aiProvider.provider }}</strong></div>
+            <div><span>当前模型</span><strong>{{ aiProvider.model }}</strong></div>
+            <div><span>模型配置</span><strong :class="aiProvider.configured ? 'status-ok' : 'status-warn'">{{ aiProvider.configured ? '已配置' : '未配置' }}</strong></div>
+            <div><span>本地降级</span><strong>{{ aiProvider.fallbackEnabled ? '已启用' : '未启用' }}</strong></div>
+          </div>
+          <div v-if="aiProvider" class="ai-provider-message" :class="{ warning: !aiProvider.configured }">
+            {{ aiProvider.configured ? '智能询盘分析已完成模型接入配置。' : '当前使用本地规则分析，请配置 DeepSeek API Key 后重启 AI 服务。' }}
+          </div>
         </el-tab-pane>
       </el-tabs>
     </section>

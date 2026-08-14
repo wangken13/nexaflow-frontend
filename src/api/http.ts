@@ -34,6 +34,12 @@ export interface ApiResponse<T> {
   data: T
 }
 
+export interface SseMessage<T> {
+  id: string
+  event: string
+  data: T
+}
+
 function fallbackMessage(status?: number, errorCode?: string) {
   if (errorCode === 'ECONNABORTED') return '请求处理超时，请稍后重试'
   if (!status) return '无法连接服务器，请检查网络或确认服务已经启动'
@@ -47,6 +53,77 @@ function fallbackMessage(status?: number, errorCode?: string) {
   if (status === 503) return '业务服务暂时不可用，请稍后重试'
   if (status === 504) return '服务处理超时，请稍后重试'
   return '服务器处理请求失败，请稍后重试'
+}
+
+export async function streamSse<T>(
+  url: string,
+  data: unknown,
+  onMessage: (message: SseMessage<T>) => void,
+  signal?: AbortSignal
+) {
+  const token = getAccessToken()
+  const response = await fetch(`/api${url}`, {
+    method: 'POST',
+    credentials: 'include',
+    signal,
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAccessToken()
+      if (location.pathname !== '/login') location.assign('/login')
+    }
+    let message = ''
+    try {
+      message = (await response.json() as ApiResponse<unknown>).message
+    } catch {
+      // Non-JSON gateway responses use the status-specific fallback below.
+    }
+    throw new Error(message || fallbackMessage(response.status))
+  }
+
+  if (!response.body) throw new Error('浏览器无法读取 AI 流式响应')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+
+  const dispatch = (block: string) => {
+    let id = ''
+    let event = 'message'
+    const lines: string[] = []
+    for (const line of block.split('\n')) {
+      if (!line || line.startsWith(':')) continue
+      if (line.startsWith('id:')) id = line.slice(3).trimStart()
+      else if (line.startsWith('event:')) event = line.slice(6).trimStart()
+      else if (line.startsWith('data:')) lines.push(line.slice(5).trimStart())
+    }
+    if (!lines.length) return
+    onMessage({ id, event, data: JSON.parse(lines.join('\n')) as T })
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, '\n')
+      let boundary = buffer.indexOf('\n\n')
+      while (boundary >= 0) {
+        dispatch(buffer.slice(0, boundary))
+        buffer = buffer.slice(boundary + 2)
+        boundary = buffer.indexOf('\n\n')
+      }
+      if (done) break
+    }
+    if (buffer.trim()) dispatch(buffer)
+  } finally {
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
+  }
 }
 
 export async function request<T>(url: string, options?: { method?: 'get' | 'post' | 'put' | 'patch' | 'delete'; data?: unknown }) {
