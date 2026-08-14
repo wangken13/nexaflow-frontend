@@ -160,6 +160,7 @@
 }
 
 .pricing-grid article {
+  position: relative;
   display: flex;
   min-height: 250px;
   flex-direction: column;
@@ -168,9 +169,22 @@
   border: 1px solid #dce6f2;
   border-radius: 8px;
   background: #fff;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .pricing-grid article.featured { border-color: #246bfd; box-shadow: 0 12px 30px rgb(36 107 253 / 10%); }
+.pricing-grid article:hover,
+.pricing-grid article:focus-within {
+  z-index: 1;
+  border-color: #246bfd;
+  box-shadow: 0 16px 36px rgb(36 107 253 / 14%);
+  transform: translateY(-5px);
+}
+.pricing-grid:has(article:hover) article.featured:not(:hover),
+.pricing-grid:has(article:focus-within) article.featured:not(:focus-within) {
+  border-color: #dce6f2;
+  box-shadow: none;
+}
 .pricing-grid p { margin: 0 0 18px; color: #51677d; font-weight: 700; }
 .pricing-grid strong { color: #112a46; font-size: 34px; line-height: 1; }
 .pricing-grid strong small { font-size: 14px; font-weight: 600; }
@@ -193,4 +207,9 @@
   .pricing-grid { grid-template-columns: 1fr; }
   .legal-page article { margin: 0 14px 36px; padding: 30px 22px; }
   .legal-page h1 { font-size: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-grid article:hover,
+  .pricing-grid article:focus-within { transform: none; }
 }
