@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Search, Upload } from '@element-plus/icons-vue'
-import { tradeApi, type ProductView, type UpsertProductRequest } from '../api/trade'
+import { Delete, Download, Edit, Plus, Search, Upload } from '@element-plus/icons-vue'
+import { tradeApi, type BulkImportResult, type ProductView, type UpsertProductRequest } from '../api/trade'
+import ImportResultDialog from '../components/ImportResultDialog.vue'
 import { currencyOptions } from '../utils/presentation'
 import { useAuthStore } from '../stores/auth'
 import { hasPermission } from '../security/permissions'
-import { parseCsv } from '../utils/csv'
+import { downloadCsv, parseCsv } from '../utils/csv'
 
 const auth = useAuthStore()
 
@@ -17,6 +18,8 @@ const editingId = ref('')
 const loading = ref(false)
 const importInput = ref<HTMLInputElement>()
 const importing = ref(false)
+const importResult = ref<BulkImportResult>()
+const importResultDialog = ref(false)
 const form = ref<UpsertProductRequest>({ sku: '', name: '', specification: '', currency: 'USD', unitPrice: 0, moq: 1, active: true })
 async function load() { loading.value = true; try { products.value = await tradeApi.products(keyword.value) } finally { loading.value = false } }
 function create() { editingId.value = ''; form.value = { sku: '', name: '', specification: '', currency: 'USD', unitPrice: 0, moq: 1, active: true }; dialog.value = true }
@@ -32,16 +35,28 @@ async function importProducts(event: Event) {
     if (rows.length > 500) throw new Error('单次最多导入 500 条产品')
     if (rows.some(row => !Number.isFinite(row.unitPrice) || !Number.isInteger(row.moq))) throw new Error('产品单价必须是数字，起订量必须是整数')
     const result = await tradeApi.importProducts(rows); await load()
-    result.skipped ? ElMessage.warning(`成功导入 ${result.imported} 条，跳过 ${result.skipped} 条：${result.errors.slice(0, 2).join('；')}`) : ElMessage.success(`成功导入 ${result.imported} 条产品`)
+    importResult.value = result; importResultDialog.value = true
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '产品导入失败') }
   finally { importing.value = false }
+}
+async function exportProducts() {
+  try {
+    const rows = await tradeApi.exportProducts()
+    downloadCsv('nexaflow-products.csv', [
+      { key: 'sku', label: '产品编号' }, { key: 'name', label: '产品名称' },
+      { key: 'specification', label: '规格' }, { key: 'currency', label: '币种' },
+      { key: 'unitPrice', label: '单价' }, { key: 'moq', label: '起订量' },
+      { key: 'active', label: '在售状态' }
+    ], rows)
+    ElMessage.success(`已导出 ${rows.length} 条产品数据`)
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '产品导出失败') }
 }
 onMounted(load)
 </script>
 
 <template>
   <section class="page-shell">
-    <header class="page-head"><div><p class="section-kicker">标准商品数据</p><h1>产品目录</h1><p>统一管理产品编号、规格、价格和起订量，报价时直接带入。</p></div><div v-if="hasPermission(auth.role, 'product:write')" class="action-row"><input ref="importInput" class="visually-hidden" type="file" accept=".csv,text/csv" @change="importProducts"><el-button :icon="Upload" :loading="importing" @click="importInput?.click()">导入 CSV</el-button><el-button type="primary" :icon="Plus" @click="create">新增产品</el-button></div></header>
+    <header class="page-head"><div><p class="section-kicker">标准商品数据</p><h1>产品目录</h1><p>统一管理产品编号、规格、价格和起订量，报价时直接带入。</p></div><div class="action-row"><el-button v-if="hasPermission(auth.role, 'data:export')" :icon="Download" @click="exportProducts">导出数据</el-button><template v-if="hasPermission(auth.role, 'product:write')"><input ref="importInput" class="visually-hidden" type="file" accept=".csv,text/csv" @change="importProducts"><el-button :icon="Upload" :loading="importing" @click="importInput?.click()">导入 CSV</el-button><el-button type="primary" :icon="Plus" @click="create">新增产品</el-button></template></div></header>
     <section class="surface table-surface" v-loading="loading">
       <div class="table-toolbar"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索产品编号或名称" clearable @keyup.enter="load"/><el-button @click="load">搜索</el-button></div>
       <el-table :data="products" row-key="id">
@@ -56,5 +71,6 @@ onMounted(load)
       <div v-if="!products.length" class="empty-compact">建立第一条产品资料后，即可在报价单中直接选择。</div>
     </section>
     <el-dialog v-model="dialog" :title="editingId ? '编辑产品' : '新增产品'" width="620px"><el-form label-position="top"><div class="form-grid"><el-form-item label="产品编号（SKU）"><el-input v-model="form.sku" placeholder="企业内部使用的产品编号"/></el-form-item><el-form-item label="产品名称"><el-input v-model="form.name"/></el-form-item><el-form-item label="报价币种"><el-select v-model="form.currency"><el-option v-for="item in currencyOptions" :key="item.value" :label="item.label" :value="item.value"/></el-select></el-form-item><el-form-item label="参考单价"><el-input-number v-model="form.unitPrice" :min="0" :precision="4"/></el-form-item><el-form-item label="最小起订量"><el-input-number v-model="form.moq" :min="1"/></el-form-item><el-form-item label="销售状态"><el-switch v-model="form.active" active-text="在售" inactive-text="停用"/></el-form-item></div><el-form-item label="规格说明"><el-input v-model="form.specification" type="textarea" :rows="3"/></el-form-item></el-form><template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" @click="save">保存产品</el-button></template></el-dialog>
+    <ImportResultDialog v-model="importResultDialog" :result="importResult" resource-label="产品资料"/>
   </section>
 </template>

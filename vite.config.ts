@@ -5,6 +5,17 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [vue()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vue: ['vue', 'vue-router', 'pinia'],
+            element: ['element-plus'],
+            utilities: ['axios']
+          }
+        }
+      }
+    },
     server: {
       proxy: {
         '/api': {

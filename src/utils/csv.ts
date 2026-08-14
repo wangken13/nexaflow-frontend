@@ -26,3 +26,25 @@ export function parseCsv(text: string): Record<string, string>[] {
   if (new Set(headers).size !== headers.length) throw new Error('CSV 文件包含重复表头')
   return rows.slice(1).map(values => Object.fromEntries(headers.map((header, index) => [header, values[index] || ''])))
 }
+
+export function serializeCsv<T extends object>(headers: Array<{ key: keyof T; label: string }>, rows: T[]) {
+  const escapeCell = (value: unknown) => {
+    let text = value == null ? '' : String(value)
+    if (/^[=+\-@]/.test(text)) text = `'${text}`
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  return [
+    headers.map(header => escapeCell(header.label)).join(','),
+    ...rows.map(row => headers.map(header => escapeCell(row[header.key])).join(','))
+  ].join('\r\n')
+}
+
+export function downloadCsv<T extends object>(filename: string, headers: Array<{ key: keyof T; label: string }>, rows: T[]) {
+  const content = serializeCsv(headers, rows)
+  const url = URL.createObjectURL(new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}

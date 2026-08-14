@@ -7,6 +7,12 @@ export const http = axios.create({
   withCredentials: true
 })
 
+function redirectToLogin() {
+  if (location.pathname === '/login') return
+  const target = location.pathname.startsWith('/app') ? `${location.pathname}${location.search}${location.hash}` : '/app'
+  location.assign(`/login?redirect=${encodeURIComponent(target)}`)
+}
+
 http.interceptors.request.use((config) => {
   const token = getAccessToken()
   if (token) {
@@ -21,7 +27,7 @@ http.interceptors.response.use(
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       clearAccessToken()
       const isLogoutRequest = error.config?.url === '/auth/logout'
-      if (!isLogoutRequest && location.pathname !== '/login') location.assign('/login')
+      if (!isLogoutRequest) redirectToLogin()
     }
     return Promise.reject(error)
   }
@@ -77,7 +83,7 @@ export async function streamSse<T>(
   if (!response.ok) {
     if (response.status === 401) {
       clearAccessToken()
-      if (location.pathname !== '/login') location.assign('/login')
+      redirectToLogin()
     }
     let message = ''
     try {

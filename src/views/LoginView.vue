@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Hide, Iphone, Lock, Refresh, User, View } from '@element-plus/icons-vue'
 import { tradeApi } from '../api/trade'
@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/auth'
 type AuthMode = 'password' | 'sms' | 'register' | 'wechat'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const mode = ref<AuthMode>('password')
 const loading = ref(false)
@@ -34,6 +35,12 @@ const modeTitle = computed(() => ({
 }[mode.value]))
 const isAccountTyping = computed(() => mode.value === 'password' && activeField.value === 'account')
 const isAccountPasswordActive = computed(() => mode.value === 'password' && activeField.value === 'password' && account.value.password.length > 0)
+const workspaceDestination = computed(() => {
+  const redirect = route.query.redirect
+  if (typeof redirect === 'string' && (redirect === '/app' || redirect.startsWith('/app/'))) return redirect
+  const stored = window.sessionStorage.getItem('nexaflow.login.redirect')
+  return stored && (stored === '/app' || stored.startsWith('/app/')) ? stored : '/app'
+})
 
 function triggerCharacterReaction(reaction: 'success' | 'error', duration = 760) {
   window.clearTimeout(characterReactionTimer)
@@ -52,9 +59,11 @@ async function celebrateLogin() {
 }
 
 async function finishLogin(data: AuthLoginResponse, fallback = '') {
+  const destination = workspaceDestination.value
   auth.applySession(data, fallback)
   await celebrateLogin()
-  await router.push('/')
+  window.sessionStorage.removeItem('nexaflow.login.redirect')
+  await router.replace(destination)
 }
 
 async function passwordLogin() {
@@ -64,7 +73,9 @@ async function passwordLogin() {
   try {
     await auth.login(account.value.username, account.value.password, captcha.value.id, captcha.value.code)
     await celebrateLogin()
-    await router.push('/')
+    const destination = workspaceDestination.value
+    window.sessionStorage.removeItem('nexaflow.login.redirect')
+    await router.replace(destination)
   } catch (error) {
     triggerCharacterReaction('error')
     ElMessage.error(error instanceof Error ? error.message : '登录失败')
@@ -157,6 +168,7 @@ async function register() {
 async function startWechatLogin() {
   loading.value = true
   try {
+    window.sessionStorage.setItem('nexaflow.login.redirect', workspaceDestination.value)
     const { authorizationUrl } = await tradeApi.wechatAuthorization()
     window.location.assign(authorizationUrl)
   } catch (error) {

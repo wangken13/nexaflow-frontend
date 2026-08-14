@@ -1,0 +1,96 @@
+openapi: 3.1.0
+info:
+  title: NexaFlow Integration API
+  version: 1.0.0
+  description: |
+    用于网站表单、消息适配器和现有业务系统向 NexaFlow 安全推送客户询盘。
+    请求签名为 HMAC-SHA256(secret, timestamp + "." + rawJsonBody)，使用小写十六进制字符串。
+    时间戳为 Unix 秒，服务端拒绝超过 5 分钟的请求。externalId 在单个接入凭据内必须唯一。
+servers:
+  - url: https://www.wkkk.site
+    description: NexaFlow 生产环境
+tags:
+  - name: Inquiry intake
+    description: 外部询盘接入
+paths:
+  /api/inquiry/inbound/{credentialId}:
+    post:
+      tags: [Inquiry intake]
+      summary: 创建或匹配客户并接收询盘
+      operationId: acceptInboundInquiry
+      security:
+        - timestamp: []
+          signature: []
+      parameters:
+        - name: credentialId
+          in: path
+          required: true
+          schema: { type: string, maxLength: 64 }
+        - name: X-Request-Id
+          in: header
+          required: false
+          description: 调用方请求追踪编号；不提供时由服务端生成。
+          schema: { type: string, maxLength: 64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InboundInquiry' }
+            examples:
+              websiteForm:
+                value:
+                  externalId: website-20260814-0001
+                  customerName: Northstar Retail Group
+                  contactName: Alice Morgan
+                  email: alice@example.com
+                  phone: "+12025550123"
+                  country: United States
+                  subject: Inquiry for 1,200 smart desk lamps
+                  content: Please provide MOQ, FOB price, sample lead time and delivery schedule.
+      responses:
+        '200':
+          description: 已接收；重复 externalId 会返回原询盘并标记 duplicate。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboundResponse' }
+        '400': { description: 字段缺失、格式错误或请求体超过 256KB }
+        '401': { description: 凭据无效、签名错误或时间戳过期 }
+        '409': { description: externalId 对应的请求内容发生冲突 }
+        '429': { description: 调用频率超过限制 }
+components:
+  securitySchemes:
+    timestamp:
+      type: apiKey
+      in: header
+      name: X-Nexa-Timestamp
+    signature:
+      type: apiKey
+      in: header
+      name: X-Nexa-Signature
+  schemas:
+    InboundInquiry:
+      type: object
+      required: [externalId, customerName, subject, content]
+      properties:
+        externalId: { type: string, maxLength: 128 }
+        customerName: { type: string, maxLength: 128 }
+        contactName: { type: string, maxLength: 128 }
+        email: { type: string, format: email, maxLength: 255 }
+        phone: { type: string, maxLength: 64 }
+        country: { type: string, maxLength: 64 }
+        subject: { type: string, maxLength: 255 }
+        content: { type: string, maxLength: 20000 }
+    InboundResponse:
+      type: object
+      required: [success, code, message, data]
+      properties:
+        success: { type: boolean }
+        code: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            inquiryId: { type: string }
+            customerId: { type: string }
+            duplicate: { type: boolean }
+            status: { type: string }

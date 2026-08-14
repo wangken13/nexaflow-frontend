@@ -25,4 +25,8 @@ assert.equal(presentation.labelOf(presentation.orderStatusLabels, 'SHIPPED'), '�
 assert.equal(presentation.humanizeSystemText('HIGH INQUIRY OWNER ACTIVE'), '紧急 客户询盘 企业负责人 已启用')
 assert.equal(presentation.formatDate('not-a-date'), '日期待确认')
 
+const csv = await loadTypeScriptModule('src/utils/csv.ts')
+const exported = csv.serializeCsv([{ key: 'name', label: '客户名称' }], [{ name: '=HYPERLINK("bad")' }])
+assert.equal(exported, '"客户名称"\r\n"\'=HYPERLINK(""bad"")"')
+
 console.log('Frontend unit tests passed')
