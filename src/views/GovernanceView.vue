@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { CopyDocument, Delete, Edit, Key, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
 import { tradeApi, type AiProviderStatus, type ApprovalRuleView, type AuditLogView, type ChannelConfigView, type ChannelCredentialView, type DepartmentView, type EmailMailboxView, type ImportJobView, type IntegrationInvocationView, type InvoiceRequestView, type KnowledgeArticleView, type MemberView, type PlanView, type RefundRequestView, type SubscriptionOrderView, type SubscriptionView } from '../api/trade'
@@ -42,6 +42,8 @@ const mailboxProvider = ref('TENCENT_ENTERPRISE')
 const mailboxForm = ref({ displayName: '', emailAddress: '', host: 'imap.exmail.qq.com', port: 993, username: '', password: '', folder: 'INBOX' })
 const approvalRuleForm = ref({ name: '', ruleType: 'AMOUNT_THRESHOLD', thresholdAmount: 10000 as number | null, conditionValue: '', enabled: true })
 const activeTab = ref('members')
+const tabLoading = ref<Record<string, boolean>>({})
+const tabErrors = ref<Record<string, string>>({})
 const memberDialog = ref(false)
 const departmentDialog = ref(false)
 const accessDialog = ref(false)
@@ -95,6 +97,29 @@ const approvalRuleLabels: Record<string, string> = { AMOUNT_THRESHOLD: '报价�
 
 async function loadMembers() { [members.value, departments.value] = await Promise.all([tradeApi.members(), tradeApi.departments()]) }
 async function loadAudits() { audits.value = await tradeApi.auditLogs(auditModule.value, auditKeyword.value) }
+async function loadImports() { importJobs.value = await tradeApi.importJobs() }
+async function loadKnowledge() { knowledge.value = await tradeApi.knowledgeArticles() }
+async function loadApprovalRules() { approvalRules.value = await tradeApi.approvalRules() }
+async function loadChannels() {
+  const [channelList, credentials, mailboxes, invocations] = await Promise.all([
+    tradeApi.channels(), tradeApi.channelCredentials(), tradeApi.emailMailboxes(), tradeApi.integrationInvocations()
+  ])
+  channels.value = channelList
+  channelCredentials.value = credentials
+  emailMailboxes.value = mailboxes
+  integrationInvocations.value = invocations
+}
+async function loadSubscription() {
+  const [usage, plans, orders, invoices, refunds] = await Promise.all([
+    tradeApi.subscription(), tradeApi.billingPlans(), tradeApi.billingOrders(),
+    tradeApi.invoiceRequests(), tradeApi.refundRequests()
+  ])
+  subscription.value = usage
+  billingPlans.value = plans
+  billingOrders.value = orders
+  invoiceRequests.value = invoices
+  refundRequests.value = refunds
+}
 async function loadAiProviderStatus() {
   if (!canManageAi.value) return
   aiStatusLoading.value = true
@@ -107,18 +132,23 @@ async function loadAiProviderStatus() {
     aiStatusLoading.value = false
   }
 }
-async function loadCommercialSettings() {
-  knowledge.value = await tradeApi.knowledgeArticles()
-  if (canManageSettings.value) {
-    const [channelList, usage, rules, credentials, mailboxes, imports, plans, orders, invoices, refunds, invocations] = await Promise.all([
-      tradeApi.channels(), tradeApi.subscription(), tradeApi.approvalRules(), tradeApi.channelCredentials(),
-      tradeApi.emailMailboxes(), tradeApi.importJobs(), tradeApi.billingPlans(), tradeApi.billingOrders(),
-      tradeApi.invoiceRequests(), tradeApi.refundRequests(), tradeApi.integrationInvocations()
-    ])
-    channels.value = channelList; subscription.value = usage; approvalRules.value = rules
-    channelCredentials.value = credentials; emailMailboxes.value = mailboxes; importJobs.value = imports
-    billingPlans.value = plans; billingOrders.value = orders; invoiceRequests.value = invoices; refundRequests.value = refunds
-    integrationInvocations.value = invocations
+async function loadTab(tab: string) {
+  if (tabLoading.value[tab]) return
+  tabLoading.value[tab] = true
+  tabErrors.value[tab] = ''
+  try {
+    if (tab === 'members') await loadMembers()
+    else if (tab === 'audits') await loadAudits()
+    else if (tab === 'imports') await loadImports()
+    else if (tab === 'knowledge') await loadKnowledge()
+    else if (tab === 'approvals') await loadApprovalRules()
+    else if (tab === 'channels') await loadChannels()
+    else if (tab === 'subscription') await loadSubscription()
+    else if (tab === 'ai') await loadAiProviderStatus()
+  } catch (error) {
+    tabErrors.value[tab] = error instanceof Error ? error.message : '当前模块加载失败，请稍后重试'
+  } finally {
+    tabLoading.value[tab] = false
   }
 }
 function openKnowledge(item?: KnowledgeArticleView) {
@@ -131,12 +161,12 @@ async function saveKnowledge() {
   saving.value = true
   try {
     editingKnowledgeId.value ? await tradeApi.updateKnowledgeArticle(editingKnowledgeId.value, knowledgeForm.value) : await tradeApi.createKnowledgeArticle(knowledgeForm.value)
-    knowledgeDialog.value = false; await loadCommercialSettings(); ElMessage.success('知识库已更新，后续 AI 分析会自动引用')
+    knowledgeDialog.value = false; await loadTab('knowledge'); ElMessage.success('知识库已更新，后续 AI 分析会自动引用')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '知识保存失败') }
   finally { saving.value = false }
 }
 async function removeKnowledge(item: KnowledgeArticleView) {
-  try { await tradeApi.deleteKnowledgeArticle(item.id); await loadCommercialSettings(); ElMessage.success('知识条目已删除') }
+  try { await tradeApi.deleteKnowledgeArticle(item.id); await loadTab('knowledge'); ElMessage.success('知识条目已删除') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '知识删除失败') }
 }
 function openChannel(item?: ChannelConfigView) {
@@ -146,7 +176,7 @@ function openChannel(item?: ChannelConfigView) {
 async function saveChannel() {
   if (!channelForm.value.displayName.trim()) return ElMessage.warning('请填写渠道名称')
   saving.value = true
-  try { await tradeApi.saveChannel(channelForm.value); channelDialog.value = false; await loadCommercialSettings(); ElMessage.success('渠道配置已保存') }
+  try { await tradeApi.saveChannel(channelForm.value); channelDialog.value = false; await loadTab('channels'); ElMessage.success('渠道配置已保存') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '渠道配置保存失败') }
   finally { saving.value = false }
 }
@@ -158,12 +188,12 @@ async function createChannelCredential() {
     credentialDialog.value = false
     credentialResultDialog.value = true
     credentialForm.value = { channelType: 'WEBSITE', displayName: '' }
-    await loadCommercialSettings()
+    await loadTab('channels')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '接入凭据创建失败') }
   finally { saving.value = false }
 }
 async function revokeChannelCredential(item: ChannelCredentialView) {
-  try { await tradeApi.revokeChannelCredential(item.id); await loadCommercialSettings(); ElMessage.success('接入凭据已停用') }
+  try { await tradeApi.revokeChannelCredential(item.id); await loadTab('channels'); ElMessage.success('接入凭据已停用') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '接入凭据停用失败') }
 }
 async function copyCredential(value: string) {
@@ -184,13 +214,13 @@ async function createEmailMailbox() {
     mailboxDialog.value = false
     mailboxForm.value = { displayName: '', emailAddress: '', host: 'imap.exmail.qq.com', port: 993, username: '', password: '', folder: 'INBOX' }
     mailboxProvider.value = 'TENCENT_ENTERPRISE'
-    await loadCommercialSettings()
+    await loadTab('channels')
     ElMessage.success('企业邮箱已接入，系统将在一分钟内开始同步未读邮件')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '企业邮箱接入失败') }
   finally { saving.value = false }
 }
 async function disableEmailMailbox(item: EmailMailboxView) {
-  try { await tradeApi.disableEmailMailbox(item.id); await loadCommercialSettings(); ElMessage.success('邮箱自动收取已停用') }
+  try { await tradeApi.disableEmailMailbox(item.id); await loadTab('channels'); ElMessage.success('邮箱自动收取已停用') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '邮箱停用失败') }
 }
 function openApprovalRule(item?: ApprovalRuleView) {
@@ -210,13 +240,13 @@ async function saveApprovalRule() {
       ? await tradeApi.updateApprovalRule(editingApprovalRuleId.value, approvalRuleForm.value)
       : await tradeApi.createApprovalRule(approvalRuleForm.value)
     approvalRuleDialog.value = false
-    await loadCommercialSettings()
+    await loadTab('approvals')
     ElMessage.success('审批规则已保存，新报价将自动执行规则')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '审批规则保存失败') }
   finally { saving.value = false }
 }
 async function removeApprovalRule(item: ApprovalRuleView) {
-  try { await tradeApi.deleteApprovalRule(item.id); await loadCommercialSettings(); ElMessage.success('审批规则已删除') }
+  try { await tradeApi.deleteApprovalRule(item.id); await loadTab('approvals'); ElMessage.success('审批规则已删除') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '审批规则删除失败') }
 }
 function usagePercent(used: number, limit: number) { return limit ? Math.min(100, Math.round(used / limit * 100)) : 0 }
@@ -228,19 +258,19 @@ async function createMember() {
     await tradeApi.createMember(form.value)
     memberDialog.value = false
     form.value = { username: '', password: '', displayName: '', email: '', role: 'SALES' }
-    await Promise.all([loadMembers(), loadAudits()])
+    await Promise.all([loadTab('members'), loadTab('audits')])
     ElMessage.success('成员已加入团队')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '新增成员失败')
   } finally { saving.value = false }
 }
 async function updateRole(member: MemberView, role: string) {
-  try { await tradeApi.updateMemberRole(member.id, role); await Promise.all([loadMembers(), loadAudits()]); ElMessage.success('角色已更新') }
+  try { await tradeApi.updateMemberRole(member.id, role); await Promise.all([loadTab('members'), loadTab('audits')]); ElMessage.success('角色已更新') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '角色更新失败') }
 }
 async function toggleStatus(member: MemberView) {
   const status = member.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
-  try { await tradeApi.updateMemberStatus(member.id, status); await Promise.all([loadMembers(), loadAudits()]); ElMessage.success(status === 'ACTIVE' ? '账号已启用' : '账号已停用') }
+  try { await tradeApi.updateMemberStatus(member.id, status); await Promise.all([loadTab('members'), loadTab('audits')]); ElMessage.success(status === 'ACTIVE' ? '账号已启用' : '账号已停用') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '状态更新失败') }
 }
 function openMemberAccess(member: MemberView) {
@@ -255,7 +285,7 @@ async function saveMemberAccess() {
   try {
     await tradeApi.updateMemberAccess(accessMember.value.id, accessForm.value)
     accessDialog.value = false
-    await Promise.all([loadMembers(), loadAudits()])
+    await Promise.all([loadTab('members'), loadTab('audits')])
     ElMessage.success('成员数据范围已更新')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '数据范围更新失败') }
   finally { saving.value = false }
@@ -267,7 +297,7 @@ async function createDepartment() {
     await tradeApi.createDepartment(departmentForm.value)
     departmentDialog.value = false
     departmentForm.value = { name: '', parentId: '' }
-    await Promise.all([loadMembers(), loadAudits()])
+    await Promise.all([loadTab('members'), loadTab('audits')])
     ElMessage.success('部门已创建')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '部门创建失败') }
   finally { saving.value = false }
@@ -277,7 +307,7 @@ async function createBillingOrder() {
   try {
     const order = await tradeApi.createBillingOrder(billingForm.value)
     billingDialog.value = false
-    await loadCommercialSettings()
+    await loadTab('subscription')
     if (order.checkoutUrl) window.open(order.checkoutUrl, '_blank', 'noopener,noreferrer')
     else ElMessage.warning('订阅订单已保存，但收银台尚未配置，请联系平台商务人员完成付款')
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : '订阅订单创建失败') }
@@ -288,7 +318,7 @@ function openInvoice(order: SubscriptionOrderView) { billingTargetOrder.value = 
 async function submitInvoice() {
   if (!billingTargetOrder.value || !invoiceForm.value.invoiceTitle.trim() || !invoiceForm.value.recipientEmail.trim()) return ElMessage.warning('请填写发票抬头和接收邮箱')
   saving.value = true
-  try { await tradeApi.createInvoiceRequest(billingTargetOrder.value.id, invoiceForm.value); invoiceDialog.value = false; await loadCommercialSettings(); ElMessage.success('发票申请已提交') }
+  try { await tradeApi.createInvoiceRequest(billingTargetOrder.value.id, invoiceForm.value); invoiceDialog.value = false; await loadTab('subscription'); ElMessage.success('发票申请已提交') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '发票申请提交失败') }
   finally { saving.value = false }
 }
@@ -296,12 +326,13 @@ function openRefund(order: SubscriptionOrderView) { billingTargetOrder.value = o
 async function submitRefund() {
   if (!billingTargetOrder.value || !refundReason.value.trim()) return ElMessage.warning('请填写退款原因')
   saving.value = true
-  try { await tradeApi.createRefundRequest(billingTargetOrder.value.id, refundReason.value); refundDialog.value = false; await loadCommercialSettings(); ElMessage.success('退款申请已提交') }
+  try { await tradeApi.createRefundRequest(billingTargetOrder.value.id, refundReason.value); refundDialog.value = false; await loadTab('subscription'); ElMessage.success('退款申请已提交') }
   catch (error) { ElMessage.error(error instanceof Error ? error.message : '退款申请提交失败') }
   finally { saving.value = false }
 }
+watch(activeTab, tab => void loadTab(tab))
 onMounted(async () => {
-  await Promise.all([loadMembers(), loadAudits(), loadAiProviderStatus(), loadCommercialSettings()])
+  await Promise.allSettled([loadTab('members'), loadTab('audits')])
 })
 </script>
 
@@ -314,7 +345,11 @@ onMounted(async () => {
       <div><span>管理账号</span><strong>{{ privilegedMembers }}</strong></div>
       <div><span>审计事件</span><strong>{{ audits.length }}</strong></div>
     </section>
-    <section class="surface governance-surface">
+    <section v-loading="Boolean(tabLoading[activeTab])" class="surface governance-surface">
+      <div v-if="tabErrors[activeTab]" class="governance-module-error" role="alert">
+        <div><strong>当前模块暂时无法使用</strong><span>{{ tabErrors[activeTab] }}</span></div>
+        <el-button @click="loadTab(activeTab)">重新加载</el-button>
+      </div>
       <el-tabs v-model="activeTab">
         <el-tab-pane label="团队成员" name="members">
           <div class="table-toolbar governance-member-toolbar"><div><strong>组织与数据边界</strong><small>按负责人或部门控制客户可见范围</small></div><el-button :icon="Plus" @click="departmentDialog = true">新增部门</el-button></div>
@@ -329,7 +364,7 @@ onMounted(async () => {
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="审计日志" name="audits">
-          <div class="table-toolbar"><el-input v-model="auditKeyword" :prefix-icon="Search" placeholder="搜索操作人或详情" clearable @keyup.enter="loadAudits"/><el-select v-model="auditModule" placeholder="全部模块" clearable @change="loadAudits"><el-option label="企业治理" value="TENANT"/></el-select><el-button @click="loadAudits">查询</el-button></div>
+          <div class="table-toolbar"><el-input v-model="auditKeyword" :prefix-icon="Search" placeholder="搜索操作人或详情" clearable @keyup.enter="loadTab('audits')"/><el-select v-model="auditModule" placeholder="全部模块" clearable @change="loadTab('audits')"><el-option label="企业治理" value="TENANT"/></el-select><el-button @click="loadTab('audits')">查询</el-button></div>
           <el-table :data="audits" row-key="id">
             <el-table-column label="时间" width="185"><template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template></el-table-column>
             <el-table-column prop="actor" label="操作账号" width="150"/>
