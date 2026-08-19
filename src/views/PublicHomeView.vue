@@ -170,12 +170,12 @@ onBeforeUnmount(stopWorkflowRotation)
         </article>
         <article class="featured">
           <header><p>专业版</p><span>适合成长团队</span></header>
-          <strong><small>¥</small>899<small>/月</small></strong><small>20 名成员 · 10,000 位客户 · 3,000 次 AI 额度</small>
+          <strong><small>¥</small>9.9<small>/月</small></strong><small>20 名成员 · 10,000 位客户 · 3,000 次 AI 额度</small>
           <RouterLink :to="{ path: '/login', query: { redirect: '/app/governance' } }">开始使用<el-icon><ArrowRight /></el-icon></RouterLink>
         </article>
         <article>
           <header><p>企业版</p><span>复杂组织协作</span></header>
-          <strong><small>¥</small>3,999<small>/月</small></strong><small>200 名成员 · 100,000 位客户 · 30,000 次 AI 额度</small>
+          <strong><small>¥</small>19.9<small>/月</small></strong><small>200 名成员 · 100,000 位客户 · 30,000 次 AI 额度</small>
           <RouterLink :to="{ path: '/login', query: { redirect: '/app/help' } }">联系支持<el-icon><ArrowRight /></el-icon></RouterLink>
         </article>
       </div>
