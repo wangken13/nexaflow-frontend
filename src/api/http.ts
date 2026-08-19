@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearAccessToken, getAccessToken } from '../auth/session'
+import { clearAccessToken, getAccessToken, setAccessToken } from '../auth/session'
 
 export const http = axios.create({
   baseURL: '/api',
@@ -7,10 +7,38 @@ export const http = axios.create({
   withCredentials: true
 })
 
+type RetryableRequestConfig = NonNullable<Parameters<typeof http.request>[0]> & {
+  _authRetry?: boolean
+}
+
+let refreshPromise: Promise<string | null> | null = null
+
 function redirectToLogin() {
   if (location.pathname === '/login') return
   const target = location.pathname.startsWith('/app') ? `${location.pathname}${location.search}${location.hash}` : '/app'
   location.assign(`/login?redirect=${encodeURIComponent(target)}`)
+}
+
+function isAuthEndpoint(url?: string) {
+  return ['/auth/login', '/auth/refresh', '/auth/logout', '/auth/captcha', '/auth/sms-login', '/auth/wechat/login']
+    .some(path => url?.endsWith(path))
+}
+
+async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = http.post<ApiResponse<{ token: string }>>('/auth/refresh')
+      .then(response => {
+        const token = response.data.data?.token
+        if (!response.data.success || !token) throw new Error('refresh failed')
+        setAccessToken(token)
+        return token
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
 }
 
 http.interceptors.request.use((config) => {
@@ -23,10 +51,20 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const config = error.config as RetryableRequestConfig | undefined
+      const isLogoutRequest = config?.url === '/auth/logout'
+      if (config && !config._authRetry && !isAuthEndpoint(config.url)) {
+        config._authRetry = true
+        const token = await refreshAccessToken()
+        if (token) {
+          config.headers = config.headers ?? {}
+          config.headers.Authorization = `Bearer ${token}`
+          return http.request(config)
+        }
+      }
       clearAccessToken()
-      const isLogoutRequest = error.config?.url === '/auth/logout'
       if (!isLogoutRequest) redirectToLogin()
     }
     return Promise.reject(error)

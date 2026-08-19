@@ -3,6 +3,8 @@ import { request } from '../api/http'
 import type { AuthLoginResponse } from '../api/trade'
 import { clearAccessToken, setAccessToken } from '../auth/session'
 
+let restorePromise: Promise<boolean> | null = null
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: '',
@@ -28,14 +30,28 @@ export const useAuthStore = defineStore('auth', {
     },
     async restore() {
       if (this.restored) return Boolean(this.token)
-      this.restored = true
-      try {
-        const data = await request<AuthLoginResponse>('/auth/refresh', { method: 'post' })
-        this.applySession(data)
-        return true
-      } catch {
-        this.logout(false)
+      if (restorePromise) return restorePromise
+
+      restorePromise = (async () => {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const data = await request<AuthLoginResponse>('/auth/refresh', { method: 'post' })
+            this.applySession(data)
+            this.restored = true
+            return true
+          } catch {
+            if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 250))
+          }
+        }
+        await this.logout(false)
+        this.restored = true
         return false
+      })()
+
+      try {
+        return await restorePromise
+      } finally {
+        restorePromise = null
       }
     },
     async logout(clearCookie = true) {
