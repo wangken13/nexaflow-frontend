@@ -111,7 +111,11 @@ export async function streamSse<T>(
       else if (line.startsWith('data:')) lines.push(line.slice(5).trimStart())
     }
     if (!lines.length) return
-    onMessage({ id, event, data: JSON.parse(lines.join('\n')) as T })
+    try {
+      onMessage({ id, event, data: JSON.parse(lines.join('\n')) as T })
+    } catch {
+      throw new Error('AI 流式响应格式异常，请稍后重试')
+    }
   }
 
   try {
