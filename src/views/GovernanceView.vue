@@ -95,30 +95,50 @@ const mailboxProviders: Record<string, { label: string; host: string; port: numb
 }
 const approvalRuleLabels: Record<string, string> = { AMOUNT_THRESHOLD: '报价金额达到阈值', VIP_CUSTOMER: '指定客户标签', TRADE_TERM: '指定贸易条款' }
 
-async function loadMembers() { [members.value, departments.value] = await Promise.all([tradeApi.members(), tradeApi.departments()]) }
+async function loadMembers() {
+  const [memberResult, departmentResult] = await Promise.allSettled([tradeApi.members(), tradeApi.departments()])
+  if (memberResult.status === 'fulfilled') members.value = memberResult.value
+  if (departmentResult.status === 'fulfilled') departments.value = departmentResult.value
+  if (memberResult.status === 'rejected') throw memberResult.reason
+  // A department query should not hide a usable member list. This also makes
+  // an older backend migration recover gracefully while it is being upgraded.
+  if (departmentResult.status === 'rejected') {
+    ElMessage.warning('部门数据暂时不可用，成员列表仍可查看；请稍后重新加载部门')
+  }
+}
 async function loadAudits() { audits.value = await tradeApi.auditLogs(auditModule.value, auditKeyword.value) }
 async function loadImports() { importJobs.value = await tradeApi.importJobs() }
 async function loadKnowledge() { knowledge.value = await tradeApi.knowledgeArticles() }
 async function loadApprovalRules() { approvalRules.value = await tradeApi.approvalRules() }
 async function loadChannels() {
-  const [channelList, credentials, mailboxes, invocations] = await Promise.all([
+  const results = await Promise.allSettled([
     tradeApi.channels(), tradeApi.channelCredentials(), tradeApi.emailMailboxes(), tradeApi.integrationInvocations()
   ])
-  channels.value = channelList
-  channelCredentials.value = credentials
-  emailMailboxes.value = mailboxes
-  integrationInvocations.value = invocations
+  if (results[0].status === 'fulfilled') channels.value = results[0].value
+  if (results[1].status === 'fulfilled') channelCredentials.value = results[1].value
+  if (results[2].status === 'fulfilled') emailMailboxes.value = results[2].value
+  if (results[3].status === 'fulfilled') integrationInvocations.value = results[3].value
+  const firstChannelFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+  if (results.every(result => result.status === 'rejected')) throw firstChannelFailure?.reason
+  if (results.some(result => result.status === 'rejected')) {
+    ElMessage.warning('部分渠道数据暂时不可用，已展示其余可用配置')
+  }
 }
 async function loadSubscription() {
-  const [usage, plans, orders, invoices, refunds] = await Promise.all([
+  const results = await Promise.allSettled([
     tradeApi.subscription(), tradeApi.billingPlans(), tradeApi.billingOrders(),
     tradeApi.invoiceRequests(), tradeApi.refundRequests()
   ])
-  subscription.value = usage
-  billingPlans.value = plans
-  billingOrders.value = orders
-  invoiceRequests.value = invoices
-  refundRequests.value = refunds
+  if (results[0].status === 'fulfilled') subscription.value = results[0].value
+  if (results[1].status === 'fulfilled') billingPlans.value = results[1].value
+  if (results[2].status === 'fulfilled') billingOrders.value = results[2].value
+  if (results[3].status === 'fulfilled') invoiceRequests.value = results[3].value
+  if (results[4].status === 'fulfilled') refundRequests.value = results[4].value
+  const firstSubscriptionFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+  if (results.every(result => result.status === 'rejected')) throw firstSubscriptionFailure?.reason
+  if (results.some(result => result.status === 'rejected')) {
+    ElMessage.warning('部分套餐数据暂时不可用，已展示其余可用信息')
+  }
 }
 async function loadAiProviderStatus() {
   if (!canManageAi.value) return

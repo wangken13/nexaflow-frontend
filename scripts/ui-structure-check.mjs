@@ -7,6 +7,9 @@ const router = readFileSync(resolve(root, 'src/router.ts'), 'utf8')
 const loginView = readFileSync(resolve(root, 'src/views/LoginView.vue'), 'utf8')
 const publicHome = readFileSync(resolve(root, 'src/views/PublicHomeView.vue'), 'utf8')
 const legalView = readFileSync(resolve(root, 'src/views/LegalView.vue'), 'utf8')
+const authStore = readFileSync(resolve(root, 'src/stores/auth.ts'), 'utf8')
+const mainEntry = readFileSync(resolve(root, 'src/main.ts'), 'utf8')
+const customersView = readFileSync(resolve(root, 'src/views/CustomersView.vue'), 'utf8')
 const loginCharactersPath = resolve(root, 'src/components/auth/AnimatedLoginCharacters.vue')
 const loginCharacterAssets = [
   'chiikawa-login.png', 'hachiware-login.png', 'usagi-login.png',
@@ -41,6 +44,20 @@ const publicSiteChecks = [
 
 if (publicSiteChecks.some(result => !result)) {
   console.error('Public website and protected workspace routing are incomplete')
+  process.exit(1)
+}
+
+const resilienceChecks = [
+  authStore.includes('applySession(data: AuthLoginResponse'),
+  authStore.includes('this.restored = true'),
+  mainEntry.includes('app.config.errorHandler'),
+  customersView.includes('Promise.allSettled'),
+  customersView.includes(':loading="savingCustomer"'),
+  customersView.includes("ElMessage.error(error instanceof Error ? error.message : '客户保存失败')")
+]
+
+if (resilienceChecks.some(result => !result)) {
+  console.error('Session restore or business action error handling is incomplete')
   process.exit(1)
 }
 

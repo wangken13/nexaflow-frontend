@@ -27,6 +27,7 @@ export const useAuthStore = defineStore('auth', {
       this.tenantId = data.tenantId
       this.role = data.role
       this.username = data.username || fallbackUsername
+      this.restored = true
     },
     async restore() {
       if (this.restored) return Boolean(this.token)
@@ -37,7 +38,6 @@ export const useAuthStore = defineStore('auth', {
           try {
             const data = await request<AuthLoginResponse>('/auth/refresh', { method: 'post' })
             this.applySession(data)
-            this.restored = true
             return true
           } catch {
             if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 250))
