@@ -206,18 +206,6 @@ onBeforeUnmount(() => window.clearTimeout(characterReactionTimer))
 <template>
   <main class="login-shell enterprise-auth-shell">
     <section class="login-visual">
-      <video
-        class="login-backdrop"
-        autoplay
-        muted
-        loop
-        playsinline
-        preload="auto"
-        poster="/media/login-cosmos-poster-v2.jpg"
-        aria-hidden="true"
-      >
-        <source src="/media/login-cosmos-hq-v2.mp4" type="video/mp4" />
-      </video>
       <header class="login-brand"><span>NX</span><div><strong>NexaFlow</strong><small>客户协同工作台</small></div></header>
     </section>
     <section class="login-auth-area">

@@ -35,13 +35,6 @@ body {
   background: #11252b;
 }
 
-.login-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background: url("/images/trade-port-login.png") center center / cover no-repeat;
-}
-
 .login-shell::after {
   content: "";
   position: absolute;
@@ -418,7 +411,6 @@ body {
 
 @media (max-width: 760px) {
   .login-shell { display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 22px; }
-  .login-backdrop { background-position: 38% center; }
   .login-shell::after { background: rgba(7, 19, 24, .7); }
   .login-copy { display: none; }
   .login-panel { grid-column: 1; grid-row: 2; max-width: 440px; margin: auto; padding: 28px 24px; }
